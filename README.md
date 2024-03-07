@@ -1,6 +1,6 @@
 # A Brief Taste
 
-This repository provides python codes for the working paper ``Detecting Miners’ Unsafe Acts Automatically by Density Estimation and Deep Learning".
+This repository provides python codes for the working paper ``*Detecting Miners’ Unsafe Acts Automatically by Density Estimation and Deep Learning*".
 
 
 
@@ -13,7 +13,7 @@ This repository provides python codes for the working paper ``Detecting Miners�
 | --- | ----------- | ----------- |
 | PCA | Directly use xxx | The very classical PCA method under the $\ell_2$-norm.|
 | [RPCA](https://dl.acm.org/doi/abs/10.1145/1970392.1970395) | Codes of the RPCA method are modified from the repository [dganguli/robust-pca](https://github.com/dganguli/robust-pca). **$\ell_1$ norm bug**: see [Error in L1-norm implementation #11](https://github.com/dganguli/robust-pca/issues/11) | **An interesting finding**: I found one typo from the original manuscript of [RPCA](https://dl.acm.org/doi/abs/10.1145/1970392.1970395), whose threshold used in line 3 of Algorithm 1 is $\mu$. This should (or may) be a typo, which should be substitued by $1/\mu$. |
-| [CSPCA]() | <font color=#008000>Codes are written by me because the authors provided no relevant codes (although I tried to search on the Internet as well as email the authors).</font> | **An interesting finding**: This work cited [???]()'s fast algorithm for $\ell_1$-norm calculation. The problem is that [???]() only provided a fast algorithm for the max PC. The CSPCA needs more than one max PC. |
+| [CSPCA](https://ieeexplore.ieee.org/document/7372472) | <font color=#008000>Codes are written by me because the authors provided no relevant codes (although I tried to search on the Internet as well as email the authors).</font> | **An interesting finding**: This work claimed to have used [*Fast computation of the L1-principal component of real-valued data*](https://ieeexplore.ieee.org/document/6855164)'s fast algorithm for solving the $\ell_1$-PCA problem in (9)-(11) on page 353. The problem is that the fast algorithm provided only one (max) PC, while the CSPCA needs $d(\geq 1)$ PCs. Thus, to avoid the above problem, I directly used the RPCA algorithm instead of using the fast algorithm to solve the aforementioned $\ell_1$-PCA problem.
 | [SSSR](https://ieeexplore.ieee.org/document/8485415) | <font color=#008000>Codes are written by me because the authors provided no relevant codes (although I tried to search on the Internet as well as email the authors).</font> | |
 | [PI]() | Original codes in `C` languange are provided by the author (sent to me in e-mail). I re-write the codes in `Python`.| |
 

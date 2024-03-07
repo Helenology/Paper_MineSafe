@@ -73,7 +73,7 @@ class CSPCA:
         L, S = rpca_model.fit(max_iter=100, iter_print=50)
         return L
 
-    def reconstruct_L(self):
+    def reconstruct_L(self, Y_L):
         pass
 
     def reconstruct_X(self):
@@ -81,9 +81,8 @@ class CSPCA:
 
     def fit(self, tol=None, max_iter=1000, iter_print=100):
         # Part B: L1-PCA for Background Extraction
-        R_L1 = self.L1_PCA()                             # background-scene subspace basis from (22)
-        Y_L = np.dot(R_L1, np.transpose(R_L1), self.Y)   # compressed-sensed low-rank component from (23)
-        L = self.reconstruct_L()                         # frame-by-frame background scene reconstruction from (24)
+        Y_L = self.L1_PCA()          # background-scene subspace basis from (22)
+        L = self.reconstruct_L(Y_L)  # frame-by-frame background scene reconstruction from (24)
 
         # Part C: Moving Object Extraction
         X = self.reconstruct_X()                    # frame-by-frame CS reconstruction from (27)
