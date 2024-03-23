@@ -42,13 +42,13 @@ class SSSR:
 
         # Initialization
         self.D = self.compute_feature()  # feature matrix with shape (l, k)
-        self.B = np.zeros(())            # low-rank background
-        self.F = np.zeros(())            # sparse foreground
-        self.S = 0
-        self.H = 0
-        self.Y1 = np.zeros(())  # Lagrangian multiplier
-        self.Y2 = np.zeros(())  # Lagrangian multiplier
-        self.Y3 = np.zeros(())  # Lagrangian multiplier
+        self.B = np.zeros_like(self.D)   # low-rank background
+        self.F = np.zeros_like(self.D)   # sparse foreground
+        self.S = np.zeros_like(self.D)   #
+        self.H = np.zeros_like(self.D)   #
+        self.Y1 = np.zeros_like(self.D)  # Lagrangian multiplier
+        self.Y2 = np.zeros_like(self.D)  # Lagrangian multiplier
+        self.Y3 = np.zeros_like(self.D)  # Lagrangian multiplier
         self.mu = 0.1                    # mu > 0 controls the penalty for violating the linear constraints
         self.mu_max = 1e10
         self.rho = 1.1
@@ -56,6 +56,12 @@ class SSSR:
         self.m = 0
         self.LS = np.zeros((self.l, self.l))
         self.LT = np.zeros((self.k, self.k))
+
+        # metrics for convergence criteria
+        self.p1 = self.nuclear_norm(self.B)  # (15)
+        self.p2 = self.l1_norm(self.F)       # (15)
+        self.p3 = self.gamma1 * np.trace(self.quadric_form(self.S, self.LS))  # (15)
+        self.p4 = self.gamma2 * np.trace(self.quadric_form(self.H, self.LT))  # (15)
 
     def get_superpixel_labels(self, s, imgname):
         """
@@ -132,5 +138,103 @@ class SSSR:
                 img_lbp[i, j] = lbp_calculated_pixel(img_gray, i, j)
         return img_lbp
 
-    def fit(self):
+    def wT(self, i, j):
+        weight = np.exp()
+    def compute_LS(self):
         pass
+
+    def compute_LT(self):
+        pass
+
+    def SVSO(self, Sigma, tau):
+        """
+        singular value shrinkage operator.
+        :param Sigma:
+        :param tau:
+        :return:
+        """
+        Sigma -= tau
+        Sigma[Sigma < 0] = 0
+        return Sigma
+
+    def update_B(self):
+        tau = 1 / self.mu                         # (9)
+        ZB = self.D - self.F + self.Y1 / self.mu  # (9)
+        U, Sigma, Vh = np.linalg.svd(ZB, full_matrices=False)        # Singular Value Decomposition of ZB
+        B = np.dot(U, np.dot(np.diag(self.SVSO(Sigma, tau)), Vh))  # (10)
+        return B
+
+    def update_H(self):
+        H = (self.Y2 + self.mu * self.F) * (2 * self.gamma2 * self.LS + self.mu)**(-1)  # (11)
+        return H
+
+    def update_S(self):
+        S = np.transpose(self.Y3 + self.mu * self.F) * (2 * self.gamma1 * self.LS + self.mu)**(-1)  # (12)
+        return S
+
+    @staticmethod
+    def shrink(M, tau):
+        return np.sign(M) * np.maximum((np.abs(M) - tau), np.zeros(M.shape))
+
+    def update_F(self):
+        ZF = (self.D - self.B + self.H + self.S + (self.Y1 + self.Y2 + self.Y3) / self.mu) / 2  # (13)
+        F = self.shrink(self.D - self.B + ZF / self.mu, self.lmbda / self.mu)                   # (14)
+        return F
+
+    def nuclear_norm(self, A):
+        """Nuclear norm of input matrix"""
+        return np.sum(np.linalg.svd(A)[1])
+
+    def l1_norm(self, A):
+        """l1 norm of input matrix"""
+        return np.sum(np.abs(A))
+
+    def p_diff(self, p1, p2):
+        return (p1 - p2)**2 / p1**2
+
+    def convergence_criteria(self):
+        p1 = self.nuclear_norm(self.B)                                        # (15)
+        p2 = self.l1_norm(self.F)                                             # (15)
+        p3 = self.gamma1 * np.trace(np.transpose(self.S) @ self.LS @ self.S)  # (15)
+        p4 = self.gamma2 * np.trace(self.H @ self.LT @ np.transpose(self.H))  # (15)
+        # check the convergence criteria in (15)
+        flag1 = self.p_diff(self.p1, p1) <= self.epsilon2                     # (15)
+        flag2 = self.p_diff(self.p2, p2) <= self.epsilon2                     # (15)
+        flag3 = self.p_diff(self.p3, p3) <= self.epsilon2                     # (15)
+        flag4 = self.p_diff(self.p4, p4) <= self.epsilon2                     # (15)
+        final_flag = (flag1) & (flag2) & (flag3) & (flag4)                    # (15)
+        # update p-metrics
+        self.p1 = p1
+        self.p2 = p2
+        self.p3 = p3
+        self.p4 = p4
+        return final_flag
+
+    def fit(self, max_iter=100):
+        """
+        Algorithm 1: Proposed B-SSSR Algorithm for MOD
+        :param max_iter:
+        :return:
+        """
+        for iter in range(max_iter):
+            # Step 1. Update B
+            self.B = self.update_B()  # (9)-(10)
+            # Step 2. Compute H, S, and F
+            self.H = self.update_H()  # (11)
+            self.S = self.update_S()
+            self.F = self.update_F()  # (14)
+            # Step 3.1 Compute Y1
+            self.Y1 = self.Y1 + self.mu * (self.X - self.B - self.F)
+            # Step 3.2 Compute Y2
+            self.Y2 = self.Y2 + self.mu * (self.F - self.H)
+            # Step 4. Compute Y3
+            self.Y3 = self.Y3 + self.mu * (self.F - self.S)
+            # Self 5. Update mu
+            self.mu = min(self.rho * self.mu, self.mu_max)
+            # Step 6. Check convergence according to (15)
+            flag = self.convergence_criteria()
+            print(f"Iter {iter}: p1:{self.p1:.4f}; p2:{self.p2:.4f}; p3:{self.p3:.4f}; p4:{self.p4:.4f}")
+            if flag:  # if converged, then end iteration and output
+                break
+            return self.B, self.F
+
