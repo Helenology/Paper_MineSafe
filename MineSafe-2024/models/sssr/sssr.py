@@ -12,20 +12,25 @@ import os
 import cv2
 import matplotlib.pyplot as plt
 import sys
+
 sys.path.append("./SLIC-master/python_interface/")
 sys.path.append("./models/sssr/local_binary_patterns-master/")
 from SLICdemo import *
 from lbp import lbp_calculated_pixel
 
+from pyflann import *
+from numpy import *
+from numpy.random import *
+
 
 class SSSR:
-    def __init__(self, X, middle_name, rp, s, lmbda, gamma1, gamma2):
+    def __init__(self, X, middle_name, rp, s, lmbda, gamma1, gamma2, epsilon1=10):
         # --------------------------------------------------------------
         # Input
         # --------------------------------------------------------------
         # Frames
-        self.X = X                   # (k, p, q)
-        self.k = X.shape[0]          # the number of frames
+        self.X = X  # (k, p, q)
+        self.k = X.shape[0]  # the number of frames
         self.p = X.shape[1]
         self.q = X.shape[2]
 
@@ -34,22 +39,23 @@ class SSSR:
         #   - self.s: the number of superpixels
         self.labels, self.s = self.get_superpixel_labels(s, middle_name)
 
-        self.rp = rp                 # the number of feature representations
-        self.l = self.rp * self.s    # the col dimension of the feature matrix D according to Section III's part A
-        self.lmbda = lmbda           #
-        self.gamma1 = gamma1         #
-        self.gamma2 = gamma2         #
+        self.rp = rp  # the number of feature representations
+        self.l = self.rp * self.s  # the col dimension of the feature matrix D according to Section III's part A
+        self.lmbda = lmbda  #
+        self.gamma1 = gamma1  #
+        self.gamma2 = gamma2  #
 
         # Initialization
+        self.epsilon1 = epsilon1  # the number of nearest neighbors
         self.D = self.compute_feature()  # feature matrix with shape (l, k)
-        self.B = np.zeros_like(self.D)   # low-rank background
-        self.F = np.zeros_like(self.D)   # sparse foreground
-        self.S = np.zeros_like(self.D)   #
-        self.H = np.zeros_like(self.D)   #
+        self.B = np.zeros_like(self.D)  # low-rank background
+        self.F = np.zeros_like(self.D)  # sparse foreground
+        self.S = np.zeros_like(self.D)  #
+        self.H = np.zeros_like(self.D)  #
         self.Y1 = np.zeros_like(self.D)  # Lagrangian multiplier
         self.Y2 = np.zeros_like(self.D)  # Lagrangian multiplier
         self.Y3 = np.zeros_like(self.D)  # Lagrangian multiplier
-        self.mu = 0.1                    # mu > 0 controls the penalty for violating the linear constraints
+        self.mu = 0.1  # mu > 0 controls the penalty for violating the linear constraints
         self.mu_max = 1e10
         self.rho = 1.1
         self.epsilon2 = 1e-4
@@ -59,7 +65,7 @@ class SSSR:
 
         # metrics for convergence criteria
         self.p1 = self.nuclear_norm(self.B)  # (15)
-        self.p2 = self.l1_norm(self.F)       # (15)
+        self.p2 = self.l1_norm(self.F)  # (15)
         self.p3 = self.gamma1 * np.trace(self.quadric_form(self.S, self.LS))  # (15)
         self.p4 = self.gamma2 * np.trace(self.quadric_form(self.H, self.LT))  # (15)
 
@@ -108,10 +114,10 @@ class SSSR:
         Dh, Dv = self.get_diff_mat()
 
         for frame_idx in range(self.k):
-            frame = self.X[frame_idx]          # shape (p, q)
+            frame = self.X[frame_idx]  # shape (p, q)
             img_lbp = self.compute_LBP(frame)  # LBP feature with shape (p, q)
-            hor_grad = np.dot(frame, Dh)       # horizontal gradient feature with shape (p, q)
-            ver_grad = np.dot(Dv, frame)       # vertical gradient feature with shape (p, q)
+            hor_grad = np.dot(frame, Dh)  # horizontal gradient feature with shape (p, q)
+            ver_grad = np.dot(Dv, frame)  # vertical gradient feature with shape (p, q)
 
             # Feature Construction
             d = []
@@ -138,13 +144,40 @@ class SSSR:
                 img_lbp[i, j] = lbp_calculated_pixel(img_gray, i, j)
         return img_lbp
 
-    def wT(self, i, j):
-        weight = np.exp()
-    def compute_LS(self):
-        pass
+    def wT(self, M, i, j):
+        di = M[:, i]
+        dj = M[:, j]
+        weight = np.exp(-np.sum((di - dj) ** 2) / (2 * self.sigma ** 2))
+        return weight
+
+    def get_edge_mat(self, M):
+        """
+        Each row represents a node.
+        :param M: the matrix in concern with shape (n, p); thus we have n nodes
+        :return: Each row contains the index of the nearest neighbors (NN). The number of the NN is self.epsilon1.
+        """
+        flann = FLANN()
+        result, dists = flann.nn(M, M, num_neighbors=self.epsilon1, algorithm="kmeans")
+        return result
 
     def compute_LT(self):
-        pass
+        weight_mat = np.zeros((self.k, self.k))
+        edge_mat = self.get_edge_matrix(np.transpose(self.D))
+        for i in range(self.k):
+            for j in edge_mat[i]:  # if there is no edge between di and dj, then w(i, j) = 0 under (4)
+                weight_mat[i, j] = self.wT(self.D, i, j)
+        LT = weight_mat * (-1)
+        for i in range(self.k):
+            row_sum = np.sum(weight_mat[i, :])
+            LT[i, i] += row_sum
+        return LT
+
+    def compute_LS(self):
+        weight_mat = np.zeros((self.l, self.l))
+        edge_mat = self.get_edge_mat(self.D)  # (l, NN)
+        for j in range(self.l):
+            for i in edge_mat[j]:
+                weight_mat[i, j] = self.wT(np.transpose(self.D), i, j)
 
     def SVSO(self, Sigma, tau):
         """
@@ -158,18 +191,18 @@ class SSSR:
         return Sigma
 
     def update_B(self):
-        tau = 1 / self.mu                         # (9)
+        tau = 1 / self.mu  # (9)
         ZB = self.D - self.F + self.Y1 / self.mu  # (9)
-        U, Sigma, Vh = np.linalg.svd(ZB, full_matrices=False)        # Singular Value Decomposition of ZB
+        U, Sigma, Vh = np.linalg.svd(ZB, full_matrices=False)  # Singular Value Decomposition of ZB
         B = np.dot(U, np.dot(np.diag(self.SVSO(Sigma, tau)), Vh))  # (10)
         return B
 
     def update_H(self):
-        H = (self.Y2 + self.mu * self.F) * (2 * self.gamma2 * self.LS + self.mu)**(-1)  # (11)
+        H = (self.Y2 + self.mu * self.F) * (2 * self.gamma2 * self.LS + self.mu) ** (-1)  # (11)
         return H
 
     def update_S(self):
-        S = np.transpose(self.Y3 + self.mu * self.F) * (2 * self.gamma1 * self.LS + self.mu)**(-1)  # (12)
+        S = np.transpose(self.Y3 + self.mu * self.F) * (2 * self.gamma1 * self.LS + self.mu) ** (-1)  # (12)
         return S
 
     @staticmethod
@@ -178,7 +211,7 @@ class SSSR:
 
     def update_F(self):
         ZF = (self.D - self.B + self.H + self.S + (self.Y1 + self.Y2 + self.Y3) / self.mu) / 2  # (13)
-        F = self.shrink(self.D - self.B + ZF / self.mu, self.lmbda / self.mu)                   # (14)
+        F = self.shrink(self.D - self.B + ZF / self.mu, self.lmbda / self.mu)  # (14)
         return F
 
     def nuclear_norm(self, A):
@@ -190,19 +223,19 @@ class SSSR:
         return np.sum(np.abs(A))
 
     def p_diff(self, p1, p2):
-        return (p1 - p2)**2 / p1**2
+        return (p1 - p2) ** 2 / p1 ** 2
 
     def convergence_criteria(self):
-        p1 = self.nuclear_norm(self.B)                                        # (15)
-        p2 = self.l1_norm(self.F)                                             # (15)
+        p1 = self.nuclear_norm(self.B)  # (15)
+        p2 = self.l1_norm(self.F)  # (15)
         p3 = self.gamma1 * np.trace(np.transpose(self.S) @ self.LS @ self.S)  # (15)
         p4 = self.gamma2 * np.trace(self.H @ self.LT @ np.transpose(self.H))  # (15)
         # check the convergence criteria in (15)
-        flag1 = self.p_diff(self.p1, p1) <= self.epsilon2                     # (15)
-        flag2 = self.p_diff(self.p2, p2) <= self.epsilon2                     # (15)
-        flag3 = self.p_diff(self.p3, p3) <= self.epsilon2                     # (15)
-        flag4 = self.p_diff(self.p4, p4) <= self.epsilon2                     # (15)
-        final_flag = (flag1) & (flag2) & (flag3) & (flag4)                    # (15)
+        flag1 = self.p_diff(self.p1, p1) <= self.epsilon2  # (15)
+        flag2 = self.p_diff(self.p2, p2) <= self.epsilon2  # (15)
+        flag3 = self.p_diff(self.p3, p3) <= self.epsilon2  # (15)
+        flag4 = self.p_diff(self.p4, p4) <= self.epsilon2  # (15)
+        final_flag = (flag1) & (flag2) & (flag3) & (flag4)  # (15)
         # update p-metrics
         self.p1 = p1
         self.p2 = p2
