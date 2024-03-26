@@ -21,10 +21,10 @@ from lbp import lbp_calculated_pixel
 from pyflann import *
 from numpy import *
 from numpy.random import *
-
+from numpy.linalg import norm
 
 class SSSR:
-    def __init__(self, X, middle_name, rp, s, lmbda, gamma1, gamma2, epsilon1=10):
+    def __init__(self, X, middle_name, rp, s, epsilon1=10):
         # --------------------------------------------------------------
         # Input
         # --------------------------------------------------------------
@@ -39,14 +39,16 @@ class SSSR:
         #   - self.s: the number of superpixels
         self.labels, self.s = self.get_superpixel_labels(s, middle_name)
 
-        self.rp = rp  # the number of feature representations
-        self.l = self.rp * self.s  # the col dimension of the feature matrix D according to Section III's part A
-        self.lmbda = lmbda  #
-        self.gamma1 = gamma1  #
-        self.gamma2 = gamma2  #
+        # Part IV. Experimental Evaluation Settings
+        self.rp = rp                          # the number of feature representations
+        self.l = self.rp * self.s             # the col dimension of the feature matrix D
+        self.lmbda = 1 / max(self.l, self.k)  #
+        self.gamma1 = 0.08                    #
+        self.gamma2 = 0.08                    #
+        self.sigma = 50                        # not specified in the article
 
         # Initialization
-        self.epsilon1 = epsilon1  # the number of nearest neighbors
+        self.epsilon1 = epsilon1         # the number of nearest neighbors
         self.D = self.compute_feature()  # feature matrix with shape (l, k)
         self.B = np.zeros_like(self.D)  # low-rank background
         self.F = np.zeros_like(self.D)  # sparse foreground
@@ -61,13 +63,13 @@ class SSSR:
         self.epsilon2 = 1e-4
         self.m = 0
         self.LS = np.zeros((self.l, self.l))
-        self.LT = np.zeros((self.k, self.k))
+        self.LT = self.compute_LT()
 
         # metrics for convergence criteria
-        self.p1 = self.nuclear_norm(self.B)  # (15)
-        self.p2 = self.l1_norm(self.F)  # (15)
-        self.p3 = self.gamma1 * np.trace(self.quadric_form(self.S, self.LS))  # (15)
-        self.p4 = self.gamma2 * np.trace(self.quadric_form(self.H, self.LT))  # (15)
+        self.p1 = self.nuclear_norm(self.B)                                        # (15)
+        self.p2 = self.l1_norm(self.F)                                             # (15)
+        self.p3 = self.gamma1 * np.trace(np.transpose(self.S) @ self.LS @ self.S)  # (15)
+        self.p4 = self.gamma2 * np.trace(self.H @ self.LT @ np.transpose(self.H))  # (15)
 
     def get_superpixel_labels(self, s, imgname):
         """
@@ -147,7 +149,7 @@ class SSSR:
     def wT(self, M, i, j):
         di = M[:, i]
         dj = M[:, j]
-        weight = np.exp(-np.sum((di - dj) ** 2) / (2 * self.sigma ** 2))
+        weight = np.exp(- norm(di - dj)**2 / (2 * self.sigma**2))
         return weight
 
     def get_edge_mat(self, M):
@@ -162,10 +164,12 @@ class SSSR:
 
     def compute_LT(self):
         weight_mat = np.zeros((self.k, self.k))
-        edge_mat = self.get_edge_matrix(np.transpose(self.D))
+        edge_mat = self.get_edge_mat(np.transpose(self.D))
+        self.edge_mat = edge_mat
         for i in range(self.k):
             for j in edge_mat[i]:  # if there is no edge between di and dj, then w(i, j) = 0 under (4)
                 weight_mat[i, j] = self.wT(self.D, i, j)
+        self.weight_mat = weight_mat
         LT = weight_mat * (-1)
         for i in range(self.k):
             row_sum = np.sum(weight_mat[i, :])
