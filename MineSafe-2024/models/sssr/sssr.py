@@ -204,7 +204,6 @@ class SSSR:
         """Compute LS relied on (7)"""
         weight_mat = np.zeros((self.l, self.l))  # weight matrix $W_S$
         edge_mat = self.get_edge_mat(self.D)     # degree matrix containing edges of the neighbors
-        LS = None
         # the calculation of LS can be found in (7)
         for i in range(self.l):
             for j in edge_mat[i]:
@@ -222,7 +221,7 @@ class SSSR:
 
     def SVSO(self, Sigma, tau):
         """
-        singular value shrinkage operator.
+        Singular value shrinkage operator.
         :param Sigma:
         :param tau:
         :return:
@@ -232,18 +231,18 @@ class SSSR:
         return Sigma
 
     def update_B(self):
-        tau = 1 / self.mu  # (9)
-        ZB = self.D - self.F + self.Y1 / self.mu  # (9)
-        U, Sigma, Vh = np.linalg.svd(ZB, full_matrices=False)  # Singular Value Decomposition of ZB
-        B = np.dot(U, np.dot(np.diag(self.SVSO(Sigma, tau)), Vh))  # (10)
+        tau = 1 / self.mu                                          # (9)
+        ZB = self.D - self.F + self.Y1 / self.mu                   # (9)
+        U, Sigma, Vh = np.linalg.svd(ZB, full_matrices=False)      # Singular Value Decomposition of ZB
+        B = U @ np.diag(self.SVSO(Sigma, tau)) @ Vh                # (10)
         return B
 
     def update_H(self):
-        H = (self.Y2 + self.mu * self.F) * (2 * self.gamma2 * self.LS + self.mu) ** (-1)  # (11)
+        H = (self.Y2 + self.mu * self.F) @ np.linalg.inv(2 * self.gamma2 * self.LT + self.mu)  # (11)
         return H
 
     def update_S(self):
-        S = np.transpose(self.Y3 + self.mu * self.F) * (2 * self.gamma1 * self.LS + self.mu) ** (-1)  # (12)
+        S = np.transpose(self.Y3 + self.mu * self.F) @ np.linalg.inv(2 * self.gamma1 * self.LS + self.mu)  # (12)
         return S
 
     @staticmethod
@@ -264,19 +263,19 @@ class SSSR:
         return np.sum(np.abs(A))
 
     def p_diff(self, p1, p2):
-        return (p1 - p2) ** 2 / p1 ** 2
+        return (p1 - p2)**2 / p2**2  # (15)
 
     def convergence_criteria(self):
-        p1 = self.nuclear_norm(self.B)  # (15)
-        p2 = self.l1_norm(self.F)  # (15)
+        p1 = self.nuclear_norm(self.B)                                        # (15)
+        p2 = self.l1_norm(self.F)                                             # (15)
         p3 = self.gamma1 * np.trace(np.transpose(self.S) @ self.LS @ self.S)  # (15)
         p4 = self.gamma2 * np.trace(self.H @ self.LT @ np.transpose(self.H))  # (15)
-        # check the convergence criteria in (15)
-        flag1 = self.p_diff(self.p1, p1) <= self.epsilon2  # (15)
-        flag2 = self.p_diff(self.p2, p2) <= self.epsilon2  # (15)
-        flag3 = self.p_diff(self.p3, p3) <= self.epsilon2  # (15)
-        flag4 = self.p_diff(self.p4, p4) <= self.epsilon2  # (15)
-        final_flag = (flag1) & (flag2) & (flag3) & (flag4)  # (15)
+        # convergence criteria in (15)
+        flag1 = self.p_diff(p1, self.p1) <= self.epsilon2  # (15)
+        flag2 = self.p_diff(p2, self.p2) <= self.epsilon2  # (15)
+        flag3 = self.p_diff(p3, self.p3) <= self.epsilon2  # (15)
+        flag4 = self.p_diff(p4, self.p4) <= self.epsilon2  # (15)
+        final_flag = flag1 and flag2 and flag3 and flag4   # (15)
         # update p-metrics
         self.p1 = p1
         self.p2 = p2
@@ -292,19 +291,19 @@ class SSSR:
         """
         for iter in range(max_iter):
             # Step 1. Update B
-            self.B = self.update_B()  # (9)-(10)
-            # Step 2. Compute H, S, and F
-            self.H = self.update_H()  # (11)
+            self.B = self.update_B()
+            # Step 2. Update H, S, and F
+            self.H = self.update_H()
             self.S = self.update_S()
-            self.F = self.update_F()  # (14)
-            # Step 3.1 Compute Y1
+            self.F = self.update_F()
+            # Step 3.1 Update Y1
             self.Y1 = self.Y1 + self.mu * (self.X - self.B - self.F)
-            # Step 3.2 Compute Y2
+            # Step 3.2 Update Y2
             self.Y2 = self.Y2 + self.mu * (self.F - self.H)
-            # Step 4. Compute Y3
+            # Step 4. Update Y3
             self.Y3 = self.Y3 + self.mu * (self.F - self.S)
             # Self 5. Update mu
-            self.mu = min(self.rho * self.mu, self.mu_max)
+            self.mu = np.min(self.rho * self.mu, self.mu_max)
             # Step 6. Check convergence according to (15)
             flag = self.convergence_criteria()
             print(f"Iter {iter}: p1:{self.p1:.4f}; p2:{self.p2:.4f}; p3:{self.p3:.4f}; p4:{self.p4:.4f}")
