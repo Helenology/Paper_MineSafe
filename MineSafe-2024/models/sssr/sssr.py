@@ -57,7 +57,7 @@ class SSSR:
         self.lmbda = 1 / max(self.l, self.k)  # parameter used in the RPCA model and in (2)
         self.gamma1 = 0.08                    # parameter introduced in (2)
         self.gamma2 = 0.08                    # parameter introduced in (2)
-        self.sigma = 50                       # !not specified in the article!
+        self.sigma = 10                       # !not specified in the article!
         # Initialization
         self.D = self.compute_feature()       # feature matrix with shape (l, k) with D = B + F
         self.B = np.zeros_like(self.D)        # low-rank background
@@ -75,10 +75,15 @@ class SSSR:
         self.LT = self.compute_LT()           # Laplacian matrix computed from the temporal graph introduced in (2)
         # metrics for convergence criteria
         self.epsilon2 = 1e-4                  # the tolerance factor set by Algorithm 1
-        self.p1 = self.nuclear_norm(self.B)                                        # defined under (15)
-        self.p2 = self.l1_norm(self.F)                                             # defined under (15)
-        self.p3 = self.gamma1 * np.trace(np.transpose(self.S) @ self.LS @ self.S)  # defined under (15)
-        self.p4 = self.gamma2 * np.trace(self.H @ self.LT @ np.transpose(self.H))  # defined under (15)
+        self.p1 = self.adjust_p(self.nuclear_norm(self.B))                                        # defined under (15)
+        self.p2 = self.adjust_p(self.l1_norm(self.F))                                             # defined under (15)
+        self.p3 = self.adjust_p(self.gamma1 * np.trace(np.transpose(self.S) @ self.LS @ self.S))  # defined under (15)
+        self.p4 = self.adjust_p(self.gamma2 * np.trace(self.H @ self.LT @ np.transpose(self.H)))  # defined under (15)
+
+    def adjust_p(self, p):
+        if p == 0:
+            return 1e-6
+        return p
 
     def get_superpixel_labels(self, s, imgname):
         """ This function is utilized directly from https://github.com/achanta/SLIC/tree/master
@@ -238,12 +243,13 @@ class SSSR:
         return B
 
     def update_H(self):
-        H = (self.Y2 + self.mu * self.F) @ np.linalg.inv(2 * self.gamma2 * self.LT + self.mu)  # (11)
+        H = (self.Y2 + self.mu * self.F) @ np.linalg.inv(2 * self.gamma2 * self.LT + self.mu * np.diag(np.ones(self.k)))  # (11)
         return H
 
-    def update_S(self):
-        S = np.transpose(self.Y3 + self.mu * self.F) @ np.linalg.inv(2 * self.gamma1 * self.LS + self.mu)  # (12)
-        return S
+    def update_S(self):  # (12)
+        S = np.transpose(self.Y3 + self.mu * self.F)
+        S = S @ np.linalg.inv(2 * self.gamma1 * self.LS + self.mu * np.diag(np.ones(self.l)))
+        return np.transpose(S)
 
     @staticmethod
     def shrink(M, tau):
@@ -277,10 +283,10 @@ class SSSR:
         flag4 = self.p_diff(p4, self.p4) <= self.epsilon2  # (15)
         final_flag = flag1 and flag2 and flag3 and flag4   # (15)
         # update p-metrics
-        self.p1 = p1
-        self.p2 = p2
-        self.p3 = p3
-        self.p4 = p4
+        self.p1 = self.adjust_p(p1)
+        self.p2 = self.adjust_p(p2)
+        self.p3 = self.adjust_p(p3)
+        self.p4 = self.adjust_p(p4)
         return final_flag
 
     def fit(self, max_iter=100):
@@ -297,17 +303,17 @@ class SSSR:
             self.S = self.update_S()
             self.F = self.update_F()
             # Step 3.1 Update Y1
-            self.Y1 = self.Y1 + self.mu * (self.X - self.B - self.F)
+            self.Y1 = self.Y1 + self.mu * (self.D - self.B - self.F)  # this is corrected from a typo I guessed
             # Step 3.2 Update Y2
             self.Y2 = self.Y2 + self.mu * (self.F - self.H)
             # Step 4. Update Y3
             self.Y3 = self.Y3 + self.mu * (self.F - self.S)
             # Self 5. Update mu
-            self.mu = np.min(self.rho * self.mu, self.mu_max)
+            # self.mu = min(self.rho * self.mu, self.mu_max)
             # Step 6. Check convergence according to (15)
             flag = self.convergence_criteria()
             print(f"Iter {iter}: p1:{self.p1:.4f}; p2:{self.p2:.4f}; p3:{self.p3:.4f}; p4:{self.p4:.4f}")
             if flag:  # if converged, then end iteration and output
                 break
-            return self.B, self.F
+        return self.B, self.F
 
