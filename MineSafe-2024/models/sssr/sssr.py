@@ -24,58 +24,68 @@ from numpy.random import *
 from numpy.linalg import norm
 
 class SSSR:
-    def __init__(self, X, middle_name, rp, s, epsilon1=10):
+    def __init__(self, X, middle_name, s, epsilon1=10):
+        """
+        The SSSR model of paper ``MOVING OBJECT DETECTION IN COMPLEX SCENE USING SPATIOTEMPORAL STRUCTURED-SPARSE RPCA"
+        :param X: A batch of frames.
+        :param middle_name: The middle frame's name, which is used to compute superpixels.
+        :param s: An initial number of superpixels.
+        :param epsilon1: The number of the nearest neighbors.
+        """
         # --------------------------------------------------------------
         # Input
         # --------------------------------------------------------------
-        # Frames
-        self.X = X  # (k, p, q)
-        self.k = X.shape[0]  # the number of frames
-        self.p = X.shape[1]
-        self.q = X.shape[2]
+        self.X = X                # (k, p, q)
+        self.k = X.shape[0]       # the number of frames
+        self.p = X.shape[1]       # image height / width
+        self.q = X.shape[2]       # image width / height
+        self.rp = 4               # the number of feature representations
+        self.epsilon1 = epsilon1  # the number of nearest neighbors
 
-        # Superpixels:
+        # --------------------------------------------------------------
+        # Superpixels
         #   - self.labels: segments of the superpixel label
-        #   - self.s: the number of superpixels
+        #   - self.s: the number of superpixels, which is an update of the input s
+        # --------------------------------------------------------------
         self.labels, self.s = self.get_superpixel_labels(s, middle_name)
 
+        # --------------------------------------------------------------
+        # Algorithm 1 Setup
+        # --------------------------------------------------------------
         # Part IV. Experimental Evaluation Settings
-        self.rp = rp                          # the number of feature representations
         self.l = self.rp * self.s             # the col dimension of the feature matrix D
-        self.lmbda = 1 / max(self.l, self.k)  #
-        self.gamma1 = 0.08                    #
-        self.gamma2 = 0.08                    #
-        self.sigma = 50                        # not specified in the article
-
+        self.lmbda = 1 / max(self.l, self.k)  # parameter used in the RPCA model and in (2)
+        self.gamma1 = 0.08                    # parameter introduced in (2)
+        self.gamma2 = 0.08                    # parameter introduced in (2)
+        self.sigma = 50                       # !not specified in the article!
         # Initialization
-        self.epsilon1 = epsilon1         # the number of nearest neighbors
-        self.D = self.compute_feature()  # feature matrix with shape (l, k)
-        self.B = np.zeros_like(self.D)  # low-rank background
-        self.F = np.zeros_like(self.D)  # sparse foreground
-        self.S = np.zeros_like(self.D)  #
-        self.H = np.zeros_like(self.D)  #
-        self.Y1 = np.zeros_like(self.D)  # Lagrangian multiplier
-        self.Y2 = np.zeros_like(self.D)  # Lagrangian multiplier
-        self.Y3 = np.zeros_like(self.D)  # Lagrangian multiplier
-        self.mu = 0.1  # mu > 0 controls the penalty for violating the linear constraints
-        self.mu_max = 1e10
-        self.rho = 1.1
-        self.epsilon2 = 1e-4
-        self.m = 0
-        self.LS = np.zeros((self.l, self.l))
-        self.LT = self.compute_LT()
-
+        self.D = self.compute_feature()       # feature matrix with shape (l, k) with D = B + F
+        self.B = np.zeros_like(self.D)        # low-rank background
+        self.F = np.zeros_like(self.D)        # sparse foreground
+        self.S = np.zeros_like(self.D)        # variable introduced in (3)
+        self.H = np.zeros_like(self.D)        # variable introduced in (3)
+        self.Y1 = np.zeros_like(self.D)       # Lagrangian multiplier introduced in (8)
+        self.Y2 = np.zeros_like(self.D)       # Lagrangian multiplier introduced in (8)
+        self.Y3 = np.zeros_like(self.D)       # Lagrangian multiplier introduced in (8)
+        self.mu = 0.1                         # mu > 0 controls the penalty for violating the linear constraints in (8)
+        self.mu_max = 1e10                    # the max value of mu set by Algorithm 1
+        self.rho = 1.1                        # set by Algorithm 1
+        self.m = 0                            # what is this?? set by Algorithm 1
+        self.LS = self.compute_LS()           # Laplacian matrix computed from the spatial graph introduced in (2)
+        self.LT = self.compute_LT()           # Laplacian matrix computed from the temporal graph introduced in (2)
         # metrics for convergence criteria
-        self.p1 = self.nuclear_norm(self.B)                                        # (15)
-        self.p2 = self.l1_norm(self.F)                                             # (15)
-        self.p3 = self.gamma1 * np.trace(np.transpose(self.S) @ self.LS @ self.S)  # (15)
-        self.p4 = self.gamma2 * np.trace(self.H @ self.LT @ np.transpose(self.H))  # (15)
+        self.epsilon2 = 1e-4                  # the tolerance factor set by Algorithm 1
+        self.p1 = self.nuclear_norm(self.B)                                        # defined under (15)
+        self.p2 = self.l1_norm(self.F)                                             # defined under (15)
+        self.p3 = self.gamma1 * np.trace(np.transpose(self.S) @ self.LS @ self.S)  # defined under (15)
+        self.p4 = self.gamma2 * np.trace(self.H @ self.LT @ np.transpose(self.H))  # defined under (15)
 
     def get_superpixel_labels(self, s, imgname):
-        """
+        """ This function is utilized directly from https://github.com/achanta/SLIC/tree/master
         Get superpixels segmentation labels and the number of superpixels.
-        :param imgname: the image path of the middle frame
-        :return: superpixels segmentation labels and the number of superpixels
+        :param s: An initial number of superpixels.
+        :param imgname: The frame's name used to compute superpixels.
+        :return: superpixels segmentation labels and the actual number of superpixels
         """
         # --------------------------------------------------------------
         # Create shared library
@@ -98,6 +108,7 @@ class SSSR:
         return labels, numlabels
 
     def get_diff_mat(self):
+        """DX is the image gradient. D is the horizontal/vertial gradient operator."""
         m = self.p
         n = self.q
         Dh = np.zeros((n, n))
@@ -111,15 +122,15 @@ class SSSR:
         return Dh, Dv
 
     def compute_feature(self):
-        labels = self.labels
-        D = np.zeros((self.l, self.k))
-        Dh, Dv = self.get_diff_mat()
+        labels = self.labels                   # superpixels segmentation labels
+        D = np.zeros((self.l, self.k))         # feature matrix D
+        Dh, Dv = self.get_diff_mat()           # horizontal and vertical gradient operators
 
         for frame_idx in range(self.k):
-            frame = self.X[frame_idx]  # shape (p, q)
+            frame = self.X[frame_idx]          # frame with shape (p, q)
             img_lbp = self.compute_LBP(frame)  # LBP feature with shape (p, q)
-            hor_grad = np.dot(frame, Dh)  # horizontal gradient feature with shape (p, q)
-            ver_grad = np.dot(Dv, frame)  # vertical gradient feature with shape (p, q)
+            hor_grad = np.dot(frame, Dh)       # horizontal gradient feature with shape (p, q)
+            ver_grad = np.dot(Dv, frame)       # vertical gradient feature with shape (p, q)
 
             # Feature Construction
             d = []
@@ -137,25 +148,25 @@ class SSSR:
         return D
 
     def compute_LBP(self, img_gray):
-        height = img_gray.shape[0]
-        width = img_gray.shape[1]
+        """Compute the local binary patterns (LBP) from https://github.com/arsho/local_binary_patterns"""
         # img_gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
-        img_lbp = np.zeros((height, width), np.uint8)
-        for i in range(0, height):
-            for j in range(0, width):
+        img_lbp = np.zeros((self.p, self.q), np.uint8)
+        for i in range(0, self.p):
+            for j in range(0, self.q):
                 img_lbp[i, j] = lbp_calculated_pixel(img_gray, i, j)
         return img_lbp
 
     def wT(self, M, i, j):
-        di = M[:, i]
-        dj = M[:, j]
-        weight = np.exp(- norm(di - dj)**2 / (2 * self.sigma**2))
+        """Compute the pairwise similarity for temporal window; see (4)."""
+        di = M[:, i]  # the ith column
+        dj = M[:, j]  # the jth column
+        weight = np.exp(- norm(di - dj)**2 / (2 * self.sigma**2))  # pairwise similarity
         return weight
 
     def get_edge_mat(self, M):
         """
-        Each row represents a node.
-        :param M: the matrix in concern with shape (n, p); thus we have n nodes
+        Compute the nearest neighbors of each row of M from http://www.cs.ubc.ca/research/flann/
+        :param M: the matrix in concern with shape (n, p) with n nodes
         :return: Each row contains the index of the nearest neighbors (NN). The number of the NN is self.epsilon1.
         """
         flann = FLANN()
@@ -163,25 +174,51 @@ class SSSR:
         return result
 
     def compute_LT(self):
-        weight_mat = np.zeros((self.k, self.k))
-        edge_mat = self.get_edge_mat(np.transpose(self.D))
-        self.edge_mat = edge_mat
+        """Compute LT defined in (6)"""
+        weight_mat = np.zeros((self.k, self.k))             # weight matrix $W_T$
+        edge_mat = self.get_edge_mat(np.transpose(self.D))  # degree matrix containing edges of the neighbors
         for i in range(self.k):
             for j in edge_mat[i]:  # if there is no edge between di and dj, then w(i, j) = 0 under (4)
                 weight_mat[i, j] = self.wT(self.D, i, j)
-        self.weight_mat = weight_mat
-        LT = weight_mat * (-1)
+        LT = weight_mat * (-1)                              # temporal graph defined in (6)
         for i in range(self.k):
-            row_sum = np.sum(weight_mat[i, :])
-            LT[i, i] += row_sum
+            row_sum = np.sum(weight_mat[i, :])              # see (6)
+            LT[i, i] += row_sum                             # see (6)
         return LT
 
+    def check_Fa(self, i, j):
+        """Check if i and j come from the same feature"""
+        flag = False
+        if (i % self.rp) == (j % self.s):
+            flag = True
+        return flag
+
+    def check_Sb(self, i, j):
+        """Check if i and j come from the same superpixel"""
+        flag = False
+        if (i // self.s) == (j // self.s):
+            flag = True
+        return flag
+
     def compute_LS(self):
-        weight_mat = np.zeros((self.l, self.l))
-        edge_mat = self.get_edge_mat(self.D)  # (l, NN)
-        for j in range(self.l):
-            for i in edge_mat[j]:
-                weight_mat[i, j] = self.wT(np.transpose(self.D), i, j)
+        """Compute LS relied on (7)"""
+        weight_mat = np.zeros((self.l, self.l))  # weight matrix $W_S$
+        edge_mat = self.get_edge_mat(self.D)     # degree matrix containing edges of the neighbors
+        LS = None
+        # the calculation of LS can be found in (7)
+        for i in range(self.l):
+            for j in edge_mat[i]:
+                Fa_flag = self.check_Fa(i, j)
+                Sb_flag = self.check_Sb(i, j)
+                if Fa_flag and not Sb_flag:
+                    weight_mat[i, j] = self.wT(np.transpose(self.D), i, j)
+                if not Fa_flag and Sb_flag:
+                    weight_mat[i, j] = 1
+        LS = weight_mat * (-1)                              # spatial graph similar to (6)
+        for i in range(self.l):
+            col_sum = np.sum(weight_mat[:, i])              # similar to (6)
+            LS[i, i] += col_sum                             # similar to (6)
+        return LS
 
     def SVSO(self, Sigma, tau):
         """
