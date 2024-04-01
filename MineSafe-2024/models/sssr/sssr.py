@@ -39,7 +39,7 @@ class SSSR:
         self.k = X.shape[0]       # the number of frames
         self.p = X.shape[1]       # image height / width
         self.q = X.shape[2]       # image width / height
-        self.rp = 4               # the number of feature representations
+        self.rp = 1               # the number of feature representations
         self.epsilon1 = epsilon1  # the number of nearest neighbors
 
         # --------------------------------------------------------------
@@ -110,6 +110,7 @@ class SSSR:
         compactness = 20.0
         doRGBtoLAB = True  # only works if it is a three channel image
         labels, numlabels = segment(imgname, numsuperpixels, compactness, doRGBtoLAB)
+        assert len(labels.shape) == 2
         return labels, numlabels
 
     def get_diff_mat(self):
@@ -142,12 +143,12 @@ class SSSR:
             for label_idx in range(self.s):
                 # intensity feature
                 d.append(frame[labels == label_idx].mean())
-                # LBP feature (local binary patterns)
-                d.append(img_lbp[labels == label_idx].mean())
-                # horizon gradient feature
-                d.append(hor_grad[labels == label_idx].mean())
-                # vertical gradient feature
-                d.append(ver_grad[labels == label_idx].mean())
+                # # LBP feature (local binary patterns)
+                # d.append(img_lbp[labels == label_idx].mean())
+                # # horizon gradient feature
+                # d.append(hor_grad[labels == label_idx].mean())
+                # # vertical gradient feature
+                # d.append(ver_grad[labels == label_idx].mean())
             # record the full feature vector for this frame into feature matrix D
             D[:, frame_idx] = d
         return D
@@ -155,10 +156,13 @@ class SSSR:
     def compute_LBP(self, img_gray):
         """Compute the local binary patterns (LBP) from https://github.com/arsho/local_binary_patterns"""
         # img_gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+        # Note that the img_gray should contain values with np.uint8!
+        img_gray = img_gray.astype(np.uint8)
         img_lbp = np.zeros((self.p, self.q), np.uint8)
         for i in range(0, self.p):
             for j in range(0, self.q):
                 img_lbp[i, j] = lbp_calculated_pixel(img_gray, i, j)
+        img_lbp = img_lbp.astype(np.int32)
         return img_lbp
 
     def wT(self, M, i, j):
