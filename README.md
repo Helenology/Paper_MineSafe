@@ -3,6 +3,12 @@
 This repository provides python codes for the working paper ``*Detecting Miners’ Unsafe Acts Automatically by Density Estimation and Deep Learning*".
 
 
+## 🛠 Installation
+
+Run the following command to install all dependencies in a conda environment named `pyflann`.
+```
+sh install.sh
+```
 
 
 ## Models (for Comparison)
