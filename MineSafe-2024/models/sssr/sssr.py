@@ -39,7 +39,7 @@ class SSSR:
         self.k = X.shape[0]       # the number of frames
         self.p = X.shape[1]       # image height / width
         self.q = X.shape[2]       # image width / height
-        self.rp = 1               # the number of feature representations
+        self.rp = 2               # the number of feature representations
         self.epsilon1 = epsilon1  # the number of nearest neighbors
 
         # --------------------------------------------------------------
@@ -57,7 +57,7 @@ class SSSR:
         self.lmbda = 1 / max(self.l, self.k)  # parameter used in the RPCA model and in (2)
         self.gamma1 = 0.08                    # parameter introduced in (2)
         self.gamma2 = 0.08                    # parameter introduced in (2)
-        self.sigma = 10                       # !not specified in the article!
+        self.sigma = 100                      # !not specified in the article!
         # Initialization
         self.D = self.compute_feature()       # feature matrix with shape (l, k) with D = B + F
         self.B = np.zeros_like(self.D)        # low-rank background
@@ -82,7 +82,7 @@ class SSSR:
 
     def adjust_p(self, p):
         if p == 0:
-            return 1e-6
+            return 0.01
         return p
 
     def get_superpixel_labels(self, s, imgname):
@@ -143,8 +143,8 @@ class SSSR:
             for label_idx in range(self.s):
                 # intensity feature
                 d.append(frame[labels == label_idx].mean())
-                # # LBP feature (local binary patterns)
-                # d.append(img_lbp[labels == label_idx].mean())
+                # LBP feature (local binary patterns)
+                d.append(img_lbp[labels == label_idx].mean())
                 # # horizon gradient feature
                 # d.append(hor_grad[labels == label_idx].mean())
                 # # vertical gradient feature
@@ -162,7 +162,9 @@ class SSSR:
         for i in range(0, self.p):
             for j in range(0, self.q):
                 img_lbp[i, j] = lbp_calculated_pixel(img_gray, i, j)
-        img_lbp = img_lbp.astype(np.int32)
+        img_lbp = img_lbp.astype(np.float64)
+        if np.max(img_lbp) > 200:
+            img_lbp /= 255.0
         return img_lbp
 
     def wT(self, M, i, j):
@@ -186,9 +188,11 @@ class SSSR:
         """Compute LT defined in (6)"""
         weight_mat = np.zeros((self.k, self.k))             # weight matrix $W_T$
         edge_mat = self.get_edge_mat(np.transpose(self.D))  # degree matrix containing edges of the neighbors
+        self.edge_mat = edge_mat
         for i in range(self.k):
             for j in edge_mat[i]:  # if there is no edge between di and dj, then w(i, j) = 0 under (4)
                 weight_mat[i, j] = self.wT(self.D, i, j)
+        self.weight_mat = weight_mat
         LT = weight_mat * (-1)                              # temporal graph defined in (6)
         for i in range(self.k):
             row_sum = np.sum(weight_mat[i, :])              # see (6)
@@ -198,7 +202,7 @@ class SSSR:
     def check_Fa(self, i, j):
         """Check if i and j come from the same feature"""
         flag = False
-        if (i % self.rp) == (j % self.s):
+        if (i % self.rp) == (j % self.rp):
             flag = True
         return flag
 
@@ -224,8 +228,8 @@ class SSSR:
                     weight_mat[i, j] = 1
         LS = weight_mat * (-1)                              # spatial graph similar to (6)
         for i in range(self.l):
-            col_sum = np.sum(weight_mat[:, i])              # similar to (6)
-            LS[i, i] += col_sum                             # similar to (6)
+            row_sum = np.sum(weight_mat[i, :])              # similar to (6)
+            LS[i, i] += row_sum                             # similar to (6)
         return LS
 
     def SVSO(self, Sigma, tau):
@@ -260,13 +264,15 @@ class SSSR:
         return np.sign(M) * np.maximum((np.abs(M) - tau), np.zeros(M.shape))
 
     def update_F(self):
-        ZF = (self.D - self.B + self.H + self.S + (self.Y1 + self.Y2 + self.Y3) / self.mu) / 2  # (13)
-        F = self.shrink(self.D - self.B + ZF / self.mu, self.lmbda / self.mu)  # (14)
+        # ZF = (self.D - self.B + self.H + self.S + (self.Y1 + self.Y2 + self.Y3) / self.mu) / 2  # (13)
+        # F = self.shrink(self.D - self.B + ZF / self.mu, self.lmbda / self.mu)  # (14)
+        F = self.shrink(self.D - self.B, self.lmbda / self.mu)  # (14)
         return F
 
     def nuclear_norm(self, A):
         """Nuclear norm of input matrix"""
-        return np.sum(np.linalg.svd(A)[1])
+        # return np.sum(np.linalg.svd(A)[1])
+        return np.linalg.norm(A, "nuc")
 
     def l1_norm(self, A):
         """l1 norm of input matrix"""
@@ -313,7 +319,7 @@ class SSSR:
             # Step 4. Update Y3
             self.Y3 = self.Y3 + self.mu * (self.F - self.S)
             # Self 5. Update mu
-            # self.mu = min(self.rho * self.mu, self.mu_max)
+            self.mu = min(self.rho * self.mu, self.mu_max)
             # Step 6. Check convergence according to (15)
             flag = self.convergence_criteria()
             print(f"Iter {iter}: p1:{self.p1:.4f}; p2:{self.p2:.4f}; p3:{self.p3:.4f}; p4:{self.p4:.4f}")
@@ -321,3 +327,12 @@ class SSSR:
                 break
         return self.B, self.F
 
+    def convert_back(self, A):
+        labels = self.labels
+        outcome = np.zeros_like(self.X)  # with shape (k, p, q)
+        for frame_idx in range(self.k):
+            for idx in range(A.shape[0]):
+                if idx % self.rp == 0:
+                    label_idx = idx // self.rp
+                    outcome[frame_idx][labels == label_idx] = A[idx, frame_idx]
+        return outcome
