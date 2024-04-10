@@ -22,6 +22,8 @@ from pyflann import *
 from numpy import *
 from numpy.random import *
 from numpy.linalg import norm
+import time
+
 
 class SSSR:
     def __init__(self, X, middle_name, s, epsilon1=10):
@@ -47,7 +49,10 @@ class SSSR:
         #   - self.labels: segments of the superpixel label
         #   - self.s: the number of superpixels, which is an update of the input s
         # --------------------------------------------------------------
+        t1 = time.time()
         self.labels, self.s = self.get_superpixel_labels(s, middle_name)
+        t2 = time.time()
+        print(f"Superpixel Time cost: {t2 - t1: .6f}")
 
         # --------------------------------------------------------------
         # Algorithm 1 Setup
@@ -130,13 +135,13 @@ class SSSR:
     def compute_feature(self):
         labels = self.labels                   # superpixels segmentation labels
         D = np.zeros((self.l, self.k))         # feature matrix D
-        Dh, Dv = self.get_diff_mat()           # horizontal and vertical gradient operators
+        # Dh, Dv = self.get_diff_mat()           # horizontal and vertical gradient operators
 
         for frame_idx in range(self.k):
             frame = self.X[frame_idx]          # frame with shape (p, q)
             img_lbp = self.compute_LBP(frame)  # LBP feature with shape (p, q)
-            hor_grad = np.dot(frame, Dh)       # horizontal gradient feature with shape (p, q)
-            ver_grad = np.dot(Dv, frame)       # vertical gradient feature with shape (p, q)
+            # hor_grad = np.dot(frame, Dh)       # horizontal gradient feature with shape (p, q)
+            # ver_grad = np.dot(Dv, frame)       # vertical gradient feature with shape (p, q)
 
             # Feature Construction
             d = []
@@ -145,7 +150,7 @@ class SSSR:
                 d.append(frame[labels == label_idx].mean())
                 # LBP feature (local binary patterns)
                 d.append(img_lbp[labels == label_idx].mean())
-                # # horizon gradient feature
+                # horizon gradient feature
                 # d.append(hor_grad[labels == label_idx].mean())
                 # # vertical gradient feature
                 # d.append(ver_grad[labels == label_idx].mean())
@@ -264,6 +269,7 @@ class SSSR:
         return np.sign(M) * np.maximum((np.abs(M) - tau), np.zeros(M.shape))
 
     def update_F(self):
+        # this seems not convergent
         # ZF = (self.D - self.B + self.H + self.S + (self.Y1 + self.Y2 + self.Y3) / self.mu) / 2  # (13)
         # F = self.shrink(self.D - self.B + ZF / self.mu, self.lmbda / self.mu)  # (14)
         F = self.shrink(self.D - self.B, self.lmbda / self.mu)  # (14)
