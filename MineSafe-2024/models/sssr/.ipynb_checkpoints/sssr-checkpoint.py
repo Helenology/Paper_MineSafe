@@ -52,7 +52,7 @@ class SSSR:
         t1 = time.time()
         self.labels, self.s = self.get_superpixel_labels(s, middle_name)
         t2 = time.time()
-        print(f"Superpixel Time cost: {t2 - t1: .6f}")
+        # print(f"Superpixel Time cost: {t2 - t1: .6f}")
 
         # --------------------------------------------------------------
         # Algorithm 1 Setup
@@ -67,7 +67,7 @@ class SSSR:
         t1 = time.time()
         self.D = self.compute_feature()       # feature matrix with shape (l, k) with D = B + F
         t2 = time.time()
-        print(f"Feature Compute Time cost: {t2 - t1: .6f}")
+        # print(f"Feature Compute Time cost: {t2 - t1: .6f}")
         self.B = np.zeros_like(self.D)        # low-rank background
         self.F = np.zeros_like(self.D)        # sparse foreground
         self.S = np.zeros_like(self.D)        # variable introduced in (3)

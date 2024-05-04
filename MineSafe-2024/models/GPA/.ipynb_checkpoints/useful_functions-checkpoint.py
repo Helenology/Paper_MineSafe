@@ -25,31 +25,6 @@ def get_location_filter(p, q, h, width=5):
     return location_filter
 
 
-def show_img_one_channel(img, IsShow=False):
-#     print(f"Image shape:{img.shape}")
-    img = np.expand_dims(img, axis=-1)
-    new_img = np.ones((img.shape[0], img.shape[1], 3)) # 生成一个空的数组，大小和原来的数组相同
-    new_img *= img # 将每个channel赋值为同样的数组
-    plt.imshow(new_img)
-    plt.xticks([])
-    plt.yticks([])
-    plt.axis('off')
-    if IsShow:
-        plt.show()
-    return
-
-
-def show_img_3_channels(img, IsShow=False):
-#     print(f"Image shape:{img.shape}")
-    plt.imshow(img)
-    plt.xticks([])
-    plt.yticks([])
-    plt.axis('off')
-    if IsShow:
-        plt.show()
-    return
-
-
 # optimal bandwidth
 def compute_optimal_bandwidths(N, alpha):
     bandwidth = np.pi**(-2/7) * (0.04158134**(0.5))**(5/7) * N**(-(1+alpha)/7)
@@ -79,6 +54,11 @@ def plot_sub_img(test_img, boxA, boxB=None, IsShow=True):
     if IsShow:
         plt.show()
     return
+
+
+def K_np(x, h): # a standard normal kernel
+    outcome = 1 / np.sqrt(2 * np.pi) * np.exp(-(x)**2 / (2 * h**2))
+    return outcome
 
 
 def K_tf(x, h): # a standard normal kernel
