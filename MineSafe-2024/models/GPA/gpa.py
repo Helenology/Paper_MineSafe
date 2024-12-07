@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Time    : 2024/4/30 11:10
 # @Author  : Helenology
-# @Site    : 
+# @Site    :
 # @File    : gpa.py.py
 # @Software: PyCharm
 
@@ -65,11 +65,11 @@ class GPA:
             gpa_matrix2 = tf.squeeze(gpa_matrix2)
             t2 = time.time()
             train_time = t2 - t1
-            print(f"--Compute second-smoothed GPA matrix time: {train_time:.4f} seconds.")
+            #             print(f"--Compute second-smoothed GPA matrix time: {train_time:.4f} seconds.")
             return gpa_matrix2, train_time
 
         train_time = t2 - t1
-        print(f"--Compute GPA matrix time: {train_time:.4f} seconds.")
+        #         print(f"--Compute GPA matrix time: {train_time:.4f} seconds.")
         return gpa_matrix, train_time
 
     def compute_density(self, raw_img):
@@ -82,7 +82,7 @@ class GPA:
         #     plt.show()
         return GPA_density
 
-    def obtain_mask(self, raw_img, blur_len=4, thres=0.15):
+    def obtain_mask(self, raw_img, blur_len=4, mask_thres=0.15, area_thres=150):
         # GPA density estimator
         t1 = time.time()
         GPA_density = self.compute_density(raw_img)
@@ -92,7 +92,7 @@ class GPA:
         GPA_density2 = tf.reshape(GPA_density, GPA_density.shape + (1, 1,))
         GPA_density2 = avg_blur_2d(GPA_density2)
         GPA_density2 = tf.squeeze(GPA_density2)
-        mask = (GPA_density2.numpy() < thres) * 1.0
+        mask = (GPA_density2.numpy() < mask_thres) * 1.0
         #     plt.imshow(mask)
         #     plt.show()
 
@@ -105,7 +105,7 @@ class GPA:
         #     print(stats)
         for k in range(stats.shape[0]):
             area = stats[k, 4]
-            if area < 150:
+            if area < area_thres:
                 #             print(f"delete the {k}th area")
                 x1 = stats[k, 0]
                 y1 = stats[k, 1]

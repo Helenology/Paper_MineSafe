@@ -2,8 +2,6 @@ library(plyr)
 library(ggplot2)
 library(reshape2)
 
-test_size = 100
-
 
 # data = read.csv('/Users/helenology/Desktop/光华/ 论文/2-MineSafe/Simulation/0619-GPU1-experiment_stats_N=1000.csv')
 data1 = read.csv("/Users/helenology/Documents/GitHub/Paper_MineSafe/MineSafe-2024/simulation/simulation(N=100).csv")
@@ -32,39 +30,58 @@ str(MSE_data)
 #   guides(fill=guide_legend(title=NULL)); pmse
 #   
 
-par(mfrow = c(1, 3))
+par(mfrow = c(1, 1), oma=c(0.2,0.2,0.2,0.2))
 plot_box = function(thres, times){
   boxplot(log(MSE)~Estimator, MSE_data[MSE_data$N == thres, ], 
-          xlab="", cex.axis = times,
-          cex.lab = times,
+          xlab="",
+          ylab="",
           ylim = c(-5.5, -1.5),
-          yaxt ="n") # 统一y轴坐标
-  axis(side = 2, # 操作y轴
-       at = seq(-5.5, -1.5, 0.5),
-       labels = seq(-5.5, -1.5, 0.5)
-       )
-
-  title(paste0('N=', thres), 
-        line=0.7,   # 标题的位置
-        font.main=1 # 标题取消加粗
-        )
+          main=paste0('N=', thres),
+          cex.lab = times,
+          cex.axis = times,
+          cex.main=times
+  )
 }
-plot_box(100, 1.1)
-plot_box(500, 1.1)
-plot_box(1000, 1.1)
-
-# boxplot(log(MSE)~Type, dat1[dat1$N == 500, ], xlab="")
-# boxplot(log(MSE)~Type, dat1[dat1$N == 1000, ], xlab="")
+plot_box(100, 2.4)
+plot_box(500, 2.4)
+plot_box(1000, 2.4)
 
 
 
-# library(gridExtra)
-# grid.arrange(p1,p2,nrow=1)
-# 
-# ggsave('/Users/helenology/Desktop/log_MSE_boxplot.png',
-#        pmse,
-#        width=18,
-#        height=12,
-#        dpi=800,
-#        units="cm")
-  
+##################### Time Comparison ##################### 
+time_data = data[, c("N", "CD_time", "DS_time", "GPA_CD_time", "GPA_DS_time")]
+time_data$N = as.factor(time_data$N)
+time_data = melt(time_data, id=c("N"), 
+                variable.name = "Estimator", 
+                value.name = "Time")
+time_data$Estimator = factor(time_data$Estimator, 
+                            levels = c('CD_time', 'DS_time', 'GPA_CD_time', 'GPA_DS_time'),
+                            labels = c("CD", "DS", "GPA-CD", "GPA-DS"))
+str(time_data)
+
+
+par(mfrow = c(1, 1), oma=c(0.2,0.2,0.2,0.2))
+plot_box = function(thres, times){
+  boxplot(Time~Estimator, time_data[time_data$N == thres, ], 
+          ylim = c(0, 2),
+          xlab="",  ylab="",
+          # ylab="Avg Time Cost",
+          cex.lab = times,
+          cex.axis = times,
+          main=paste0('N=', thres),
+          cex.main=times)
+}
+plot_box(100, 2.2)
+plot_box(500, 2.2)
+plot_box(1000, 2.2)
+
+# yaxt ="n") # 统一y轴坐标
+# axis(side = 2, # 操作y轴
+#      at = seq(0, 2, by=0.2),
+#      labels = seq(0, 2, by=0.2),
+# )
+# title(paste0('N=', thres), 
+#       line=0.7,   # 标题的位置
+#       cex.lab=5,
+#       # font.main=1 # 标题取消加粗
+# )
