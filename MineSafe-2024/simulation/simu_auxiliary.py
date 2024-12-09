@@ -50,8 +50,8 @@ def compute_optimal_bandwidths(N, M, sigma):
 
 def generate_simulate_data(path, N, mean, sigma):
     if os.path.exists(path):  # 文件夹存在就删除文件夹
-        shutil.rmtree(path)  # 递归删除
-    os.mkdir(path)  # 创建空文件夹
+        shutil.rmtree(path)   # 递归删除
+    os.mkdir(path)            # 创建空文件夹
 
     # generate new images
     for i in range(N):
@@ -97,7 +97,7 @@ def compute_DS_matrix(CD_est, location_weight):
 
 
 def test_CD(p, q, test_img, bandwidth, path):
-    if os.path.exists(path) is False:  # 文件夹存在就删除文件夹
+    if os.path.exists(path) is False:
         print("No simulating images stored!")
         return None, None
 

@@ -24,6 +24,8 @@ import pandas as pd
 
 sys.path.append("./models/GPA")
 from useful_functions import *
+sys.path.append("./experiment1/")
+from exper_auxiliary import load_and_preprocess_image
 
 
 class GPA:
@@ -124,7 +126,7 @@ class GPA:
             plt.imshow(tmp_tensor)
             plt.title(f"[1] tmp_tensor - density_thres={density_thres}")
             plt.show()
-        tmp_tensor = tf.reshape(tmp_tensor, (1, p, q, 1))
+        tmp_tensor = tf.reshape(tmp_tensor, (1, self.p, self.q, 1))
         avg_blur_2d = AveragePooling2D(pool_size=(blur_len, blur_len), strides=1, padding='same')
         blur_tensor = tf.squeeze(avg_blur_2d(tmp_tensor))
         if debug:
