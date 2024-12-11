@@ -15,16 +15,13 @@ import pickle
 import tensorflow as tf
 import time
 import sys
-import seaborn as sns
 from sklearn.metrics import f1_score, recall_score, confusion_matrix
 from tensorflow.keras.layers import AveragePooling2D
 import cv2
-import re
-import pandas as pd
 
-sys.path.append("./models/GPA")
+sys.path.append("../../")
 from useful_functions import *
-from utils import load_and_preprocess_image
+from utils import load_and_preprocess_image, get_location_filter, K_tf
 
 
 class GPA:

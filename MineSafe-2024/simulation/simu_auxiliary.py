@@ -56,36 +56,35 @@ def generate_simulate_data(path, N, mean, sigma):
     # generate new images
     for i in range(N):
         train_img = generate_random_simulate_image(mean, sigma)
-        np.save(path + f"/train_img_{i}.npy", train_img.numpy())
+        np.save(path + f"train_img_{i}.npy", train_img.numpy())
 
 
 def compute_CD_matrix(path, N, G, p, q, bandwidth, tick_tensor):
     CD_tensor = tf.zeros((G, p, q), dtype=tf.float32)
     for i in range(N):
-        simulate_img = np.load(path + f"/simulate_img_{i}.npy")
-        simulate_img = tf.constant(simulate_img)
+        train_img = tf.constant(np.load(path + f"/train_img_{i}.npy"))
         # compute classic nonparametric density estimator
-        tmp_tensor = 1 / tf.sqrt(2 * np.pi) * tf.exp(-(simulate_img - tick_tensor) ** 2 / (2 * bandwidth ** 2))
+        tmp_tensor = 1 / tf.sqrt(2 * np.pi) * tf.exp(-(train_img - tick_tensor) ** 2 / (2 * bandwidth ** 2))
         tmp_tensor = tmp_tensor / (N * bandwidth)
         CD_tensor += tmp_tensor
     print(f"-[CD] Successfully compute classical density with N={N} at " + path)
     return tf.squeeze(CD_tensor)
 
 
-def compute_location_weight(p, q, h, truncate_width=5):
-    # the locations of the pixels
-    location_weight0 = np.zeros([truncate_width, truncate_width, 2])
-    for i in range(truncate_width):
-        location_weight0[i, 0:truncate_width, 0] = abs(i-truncate_width//2) / p
-    for j in range(truncate_width):
-        location_weight0[0:truncate_width, j, 1] = abs(j-truncate_width//2) / q
+# def compute_location_weight(p, q, h, width=5):
+#     # the locations of the pixels
+#     location_weight0 = np.zeros([width, width, 2])
+#     for i in range(width):
+#         location_weight0[i, 0:width, 0] = abs(i-width//2) / p
+#     for j in range(width):
+#         location_weight0[0:width, j, 1] = abs(j-width//2) / q
 
-    # location weight from (0, 0)
-    location_weight = K_np(location_weight0[:, :, 0], h) * K_np(location_weight0[:, :, 1], h)
-    # # show the location weights in heatmap
-    # sns.heatmap(location_weight)
-    # plt.show()
-    return location_weight
+#     # location weight from (0, 0)
+#     location_weight = K_np(location_weight0[:, :, 0], h) * K_np(location_weight0[:, :, 1], h)
+#     # # show the location weights in heatmap
+#     # sns.heatmap(location_weight)
+#     # plt.show()
+#     return location_weight
 
 
 def compute_DS_matrix(CD_est, location_weight):
