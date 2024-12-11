@@ -24,12 +24,11 @@ import pandas as pd
 
 sys.path.append("./models/GPA")
 from useful_functions import *
-sys.path.append("./experiment1/")
-from exper_auxiliary import load_and_preprocess_image
+from utils import load_and_preprocess_image
 
 
 class GPA:
-    def __init__(self, G, p, q, train_list, second_smooth=True, gpa_matrix=None):
+    def __init__(self, G, p, q, train_list, second_smooth=True, gpa_matrix=None, grid_point=None):
         """
         Initialization.
         :param G: the number of grid points
@@ -38,15 +37,17 @@ class GPA:
         :param train_list: path list of randomly selected images
         :param second_smooth: (1) True: smooth the GPA matrix over pixel locations $s$ or DS estimator;
                               (2) False: the original KDE or CD estimator;
-        :param gpa_matrix: (1) None: GPA matrix will be computed here;
+        :param gpa_matrix: (1) None: GPA matrix will be computed based on the grid points;
                            (2) the pre-computed GPA matrix
+        :param grid_point: (1) None: grid_point will be randomly generated;
+                           (2) the pre-specified tick numbers
         """
         # basic parameters
-        self.G = G                    # the number of grid points
-        self.p = p                    # image height
-        self.q = q                    # image width
+        self.G = G  # the number of grid points
+        self.p = p  # image height
+        self.q = q  # image width
         self.train_list = train_list  # path list of randomly selected images
-        self.N0 = len(train_list)     # the number of randomly selected images
+        self.N0 = len(train_list)  # the number of randomly selected images
 
         # compute optimal bandwidth
         self.alpha = np.log(p * q) / np.log(self.N0)
@@ -54,15 +55,17 @@ class GPA:
 
         # grid points {x_g^*: 1 <= g <= G}
         rng = np.random.default_rng(seed=0)  # random number generator
-        tick_list = rng.random(size=G)       # grid points
-        self.tick_tensor = tf.concat([tf.ones([1, p, q]) * tick for tick in tick_list], axis=0)  # grid points in tensor
-
+        if grid_point is None:
+            tick_list = rng.random(size=G)  # grid points
+            self.grid_point = tf.concat([tf.ones([1, p, q]) * tick for tick in tick_list], axis=0)
+        else:
+            self.grid_point = grid_point
         # compute GPA matrix
         if gpa_matrix is None:
             self.gpa_matrix, self.train_time = self.compute_GPA_matrix(second_smooth=second_smooth)
+            self.gpa_matrix /= tf.reduce_max(self.gpa_matrix)
         else:
             self.gpa_matrix, self.train_time = gpa_matrix, None
-        self.gpa_matrix /= tf.reduce_max(self.gpa_matrix)
 
     def compute_GPA_matrix(self, second_smooth=True):
         """
@@ -77,7 +80,7 @@ class GPA:
         for i in range(self.N0):
             img = load_and_preprocess_image(self.train_list[i], (self.p, self.q))
             tmp_tensor = (1 / (self.N0 * self.bandwidth)) * (1 / tf.sqrt(2 * np.pi)) * tf.exp(
-                -(img - self.tick_tensor) ** 2 / (2 * self.bandwidth ** 2))
+                -(img - self.grid_point) ** 2 / (2 * self.bandwidth ** 2))
             gpa_matrix += tmp_tensor
         t2 = time.time()
 
@@ -101,7 +104,7 @@ class GPA:
         :param new_img: a new image.
         :return:
         """
-        Omega2_star = K_tf(self.tick_tensor - new_img, self.bandwidth_star)
+        Omega2_star = K_tf(self.grid_point - new_img, self.bandwidth_star)
         Omega1_star = Omega2_star * self.gpa_matrix
         Omega1_star = tf.reduce_sum(Omega1_star, axis=0)
         Omega2_star = tf.reduce_sum(Omega2_star, axis=0)
@@ -160,8 +163,8 @@ class GPA:
         else:  # 返回bounding box
             if debug:
                 print(stats)
-            stats = stats[stats[:, 4] > area_thres,]
+            stats = stats[stats[:, 4] > area_thres, ]
             try:
-                return stats[0,]
+                return stats[0, ]
             except:
                 return None

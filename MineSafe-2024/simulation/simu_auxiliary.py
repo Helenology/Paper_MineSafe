@@ -55,8 +55,8 @@ def generate_simulate_data(path, N, mean, sigma):
 
     # generate new images
     for i in range(N):
-        simulate_img = generate_random_simulate_image(mean, sigma)
-        np.save(path + f"/simulate_img_{i}.npy", simulate_img.numpy())
+        train_img = generate_random_simulate_image(mean, sigma)
+        np.save(path + f"/train_img_{i}.npy", train_img.numpy())
 
 
 def compute_CD_matrix(path, N, G, p, q, bandwidth, tick_tensor):
@@ -89,28 +89,29 @@ def compute_location_weight(p, q, h, truncate_width=5):
 
 
 def compute_DS_matrix(CD_est, location_weight):
-    CD_est = tf.reshape(CD_est, [*CD_est.shape, 1])
+    CD_est = tf.squeeze(CD_est)
+    CD_est = tf.reshape(CD_est, [1, *CD_est.shape, 1])
     Omega1 = tf.nn.depthwise_conv2d(CD_est, location_weight, strides=[1, 1, 1, 1], padding='SAME')
     Omega2 = tf.reduce_sum(location_weight)
     DS_est = Omega1 / Omega2
     return DS_est
 
 
-def test_CD(p, q, test_img, bandwidth, path):
-    if os.path.exists(path) is False:
-        print("No simulating images stored!")
-        return None, None
+# def test_CD(p, q, test_img, bandwidth, path):
+#     if os.path.exists(path) is False:
+#         print("No simulating images stored!")
+#         return None, None
 
-    # 得到每一张模拟图片的路径
-    train_list = os.listdir(path)
-    train_list = [path + '/' + item for item in train_list]
-    N = len(train_list)
-    CD_est = tf.zeros((1, p, q), dtype=tf.float32)
+#     # 得到每一张模拟图片的路径
+#     train_list = os.listdir(path)
+#     train_list = [path + '/' + item for item in train_list]
+#     N = len(train_list)
+#     CD_est = tf.zeros((1, p, q), dtype=tf.float32)
 
-    for i in range(N):
-        simulate_img = tf.constant(np.load(train_list[i]))
-        tmp_tensor = 1 / tf.sqrt(2 * np.pi) * tf.exp(-(simulate_img - test_img) ** 2 / (2 * bandwidth ** 2))
-        tmp_tensor = tmp_tensor / (N * bandwidth)
-        CD_est += tmp_tensor
+#     for i in range(N):
+#         simulate_img = tf.constant(np.load(train_list[i]))
+#         tmp_tensor = 1 / tf.sqrt(2 * np.pi) * tf.exp(-(simulate_img - test_img) ** 2 / (2 * bandwidth ** 2))
+#         tmp_tensor = tmp_tensor / (N * bandwidth)
+#         CD_est += tmp_tensor
 
-    return CD_est
+#     return CD_est
