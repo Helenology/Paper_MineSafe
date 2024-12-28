@@ -9,6 +9,9 @@
 
 import numpy as np
 import tensorflow as tf
+import sys
+sys.path.append("../../")
+from utils import load_and_preprocess_image
 
 
 class CD:
@@ -22,14 +25,20 @@ class CD:
     def CD_estimation(self, test_img, bandwidth):
         """
         Kernel Density Estimation or Classical Density (CD) Estimation.
-        :param test_img: a new test image
+        :param test_img: new test image(s)
         :param bandwidth: the $h$ in the kernel smoothing term $K(Xi/h - x/h)$
         :return:
         """
-        CD_test = tf.zeros((1, self.p, self.q), dtype=tf.float32)
+        batch_size = 1
+        if len(test_img.shape) == 3:
+            batch_size = test_img.shape[0]
+        CD_test = tf.zeros((batch_size, self.p, self.q), dtype=tf.float32)
         for i in range(self.N):  # $\sum_{i} 1 / (Nh) K { (Xi(s) - x) / h }$
             # read in a train image $Xi(s)$
-            train_img = tf.constant(np.load(self.train_list[i]))
+            try:
+                train_img = tf.constant(np.load(self.train_list[i]))
+            except:
+                train_img = load_and_preprocess_image(self.train_list[i], (1, self.p, self.q))
             # $1 / (Nh) K { (Xi(s) - x) / h }$
             tmp_tensor = 1 / tf.sqrt(2 * np.pi) * tf.exp(-(train_img - test_img) ** 2 / (2 * bandwidth ** 2))
             tmp_tensor = tmp_tensor / (self.N * bandwidth)
