@@ -3,7 +3,6 @@ library(ggplot2)
 library(reshape2)
 
 
-# data = read.csv('/Users/helenology/Desktop/光华/ 论文/2-MineSafe/Simulation/0619-GPU1-experiment_stats_N=1000.csv')
 data1 = read.csv("/Users/helenology/Documents/GitHub/Paper_MineSafe/MineSafe-2024/simulation/simulation(N=100).csv")
 data2 = read.csv("/Users/helenology/Documents/GitHub/Paper_MineSafe/MineSafe-2024/simulation/simulation(N=500).csv")
 data3 = read.csv("/Users/helenology/Documents/GitHub/Paper_MineSafe/MineSafe-2024/simulation/simulation(N=1000).csv")
@@ -42,9 +41,18 @@ plot_box = function(thres, times){
           cex.main=times
   )
 }
-plot_box(100, 2.4)
-plot_box(500, 2.4)
-plot_box(1000, 2.4)
+
+pdf("./logMSE_N=100.pdf") # create painting environment
+plot_box(100, 1.5) # boxplot
+dev.off() # close the environment
+
+pdf("./logMSE_N=500.pdf") # create painting environment
+plot_box(500, 1.5) # boxplot
+dev.off() # close the environment
+
+pdf("./logMSE_N=1000.pdf") # create painting environment
+plot_box(1000, 1.5) # boxplot
+dev.off() # close the environment
 
 
 
@@ -71,9 +79,17 @@ plot_box = function(thres, times){
           main=paste0('N=', thres),
           cex.main=times)
 }
-plot_box(100, 2.2)
-plot_box(500, 2.2)
-plot_box(1000, 2.2)
+pdf("./time_N=100.pdf") # create painting environment
+plot_box(100, 1.5) # boxplot
+dev.off() # close the environment
+
+pdf("./time_N=500.pdf") # create painting environment
+plot_box(500, 1.5) # boxplot
+dev.off() # close the environment
+
+pdf("./time_N=1000.pdf") # create painting environment
+plot_box(1000, 1.5) # boxplot
+dev.off() # close the environment
 
 # yaxt ="n") # 统一y轴坐标
 # axis(side = 2, # 操作y轴
