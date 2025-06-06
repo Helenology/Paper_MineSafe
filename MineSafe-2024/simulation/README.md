@@ -7,6 +7,7 @@ The codes to reproduce results in Section 2.5 (simulation study).
     ```commandline
     sh install.sh
     ```
+    > Remark: The `tensorflow_probability` package must be carefully version-matched to the `Tensorflow` package to prevent compatibility issues.
 
 
 ## Table of Contents

@@ -3,9 +3,9 @@ library(ggplot2)
 library(reshape2)
 
 
-data1 = read.csv("/Users/helenology/Documents/GitHub/Paper_MineSafe/MineSafe-2024/simulation/simulation(N=100).csv")
-data2 = read.csv("/Users/helenology/Documents/GitHub/Paper_MineSafe/MineSafe-2024/simulation/simulation(N=500).csv")
-data3 = read.csv("/Users/helenology/Documents/GitHub/Paper_MineSafe/MineSafe-2024/simulation/simulation(N=1000).csv")
+data1 = read.csv("/Users/helenology/Documents/GitHub/Paper_MineSafe/MineSafe-2024/simulation/results/simulation(N=100).csv")
+data2 = read.csv("/Users/helenology/Documents/GitHub/Paper_MineSafe/MineSafe-2024/simulation/results/simulation(N=500).csv")
+data3 = read.csv("/Users/helenology/Documents/GitHub/Paper_MineSafe/MineSafe-2024/simulation/results/simulation(N=1000).csv")
 data = rbind(data1, data2, data3)
 data = data[, -c(1, 3)]
 
@@ -42,15 +42,15 @@ plot_box = function(thres, times){
   )
 }
 
-pdf("./logMSE_N=100.pdf") # create painting environment
+pdf("./results1/logMSE_N=100.pdf") # create painting environment
 plot_box(100, 1.5) # boxplot
 dev.off() # close the environment
 
-pdf("./logMSE_N=500.pdf") # create painting environment
+pdf("./results1/logMSE_N=500.pdf") # create painting environment
 plot_box(500, 1.5) # boxplot
 dev.off() # close the environment
 
-pdf("./logMSE_N=1000.pdf") # create painting environment
+pdf("./results1/logMSE_N=1000.pdf") # create painting environment
 plot_box(1000, 1.5) # boxplot
 dev.off() # close the environment
 
@@ -69,26 +69,27 @@ str(time_data)
 
 
 par(mfrow = c(1, 1), oma=c(0.2,0.2,0.2,0.2))
-plot_box = function(thres, times){
-  boxplot(Time~Estimator, time_data[time_data$N == thres, ], 
-          ylim = c(0, 2),
+plot_box = function(thres){
+  boxplot(log(Time)~Estimator, time_data[time_data$N == thres, ], 
+          ylim = c(-8, 1),
           xlab="",  ylab="",
           # ylab="Avg Time Cost",
-          cex.lab = times,
-          cex.axis = times,
+          cex.lab = 1.5,
+          cex.axis = 1.5,
           main=paste0('N=', thres),
-          cex.main=times)
+          cex.main=1.5)
 }
-pdf("./time_N=100.pdf") # create painting environment
-plot_box(100, 1.5) # boxplot
+
+pdf("./results/logtime_N=100.pdf") # create painting environment
+plot_box(100) # boxplot
 dev.off() # close the environment
 
-pdf("./time_N=500.pdf") # create painting environment
-plot_box(500, 1.5) # boxplot
+pdf("./results/logtime_N=500.pdf") # create painting environment
+plot_box(500) # boxplot
 dev.off() # close the environment
 
-pdf("./time_N=1000.pdf") # create painting environment
-plot_box(1000, 1.5) # boxplot
+pdf("./results/logtime_N=1000.pdf") # create painting environment
+plot_box(1000) # boxplot
 dev.off() # close the environment
 
 # yaxt ="n") # 统一y轴坐标
