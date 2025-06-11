@@ -1,23 +1,29 @@
-# A Brief Taste
+# A Brief Overview
 
-This repository provides Python codes for the working paper ``*Detecting Miners’ Unsafe Acts Automatically by Density Estimation and Deep Learning*".
+This repository contains Python code for the paper "Doubly Smoothed Density Estimation with Application to Miners’ Unsafe Act Detection."
 
 
 ## 🛠 Installation
 
-- Run the following command to install all dependencies in a conda environment named `pyflann` and `TensorFlow Probability`.
-    ```
-    sh install.sh
-    ```
-- Note that `TensorFlow Probability` is strict with some specific `TensorFlow` version. PPlease see [https://github.com/tensorflow/probability/releases](https://github.com/tensorflow/probability/releases) to choose the right version to install `TensorFlow Probability` or upgrate `TensorFlow`.
+- Before running the code, please execute the following command in the **parent directory** via the terminal: `sh install.sh`
+    > ⚠️ Note: Ensure that the versions of `tensorflow_probability` and `tensorflow` are properly matched to avoid compatibility issues.
+    `TensorFlow Probability` has strict version requirements for specific `TensorFlow` releases. Please refer to the [official release compatibility table](https://github.com/tensorflow/probability/releases) to select the appropriate version of `TensorFlow Probability` or upgrate your `TensorFlow` installation accordingly.
 
-## 🔭 Codes Overview
 
-The repository consists of two parts: simulation studies and real data.
+## 📊 Part I. Simulation
 
-### Part I. Simulation
+This section provides reproducible code for Section 2.5 ("A Simulation Study") of the main paper.
 
-The simulation results are in [simulation](./MineSafe-2024/simulation/) folder.
+|                        Folder / File                        |                    Information                     |
+|:--------------------------------------------------:|:--------------------------------------------------:|
+| [simulation/](./simulation) | Contains all simulation scripts and result files. |
+|           [install.sh](./install.sh)           |                  		Shell script for setting up the required environment.                   |
+|           [models/](./models/)           |                  		Includes Python code for the CD, DS, and GPA models.                   |
+|           [utils.py](./utils.py)           |                  		Utility functions used across simulation scripts.                   |
+
+
+- 🔔 Detailed instructions and explanations are available in the [SIMULATION README](./simulation/README.md). 
+- 🔔🔔 The main reproducible code for Section 2.5 can be found in [./simulation/[Fig4]Simulation.ipynb](./simulation/[Fig4]Simulation.ipynb).
 
 
 ### Part II. Real Data
@@ -41,8 +47,3 @@ The simulation results are in [simulation](./MineSafe-2024/simulation/) folder.
 | [RPCA](https://dl.acm.org/doi/abs/10.1145/1970392.1970395) |[MineSafe-2024/models/robust-pca-master/r_pca.py](MineSafe-2024/models/robust-pca-master/r_pca.py)| Python to implement the robust PCA (RPCA) algorithm. |
 
 
-# Datasets
-
-| Dataset | Source | More Info |
-| --- | ----------- | ----------- |
-| Airport | xxx | |

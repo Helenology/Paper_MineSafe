@@ -1,1 +1,0 @@
-./dataset/baseline/pedestrians/input/in000851.jpg
